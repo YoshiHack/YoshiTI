@@ -51,3 +51,9 @@
 1. Clone the repo:  
    ```bash
    git clone https://github.com/YoshiHack/YoshiTI.git
+
+   bash
+
+   make -j
+
+   
