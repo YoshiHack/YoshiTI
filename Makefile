@@ -1,57 +1,26 @@
-# -----------------------------------------
-# YoshiTI (ASM) — CEdev-compatible Makefile
-# -----------------------------------------
-# Requires:
-#   - CEdev installed and CEDEV env var set
-#   - fasmg in PATH (or set FASMG below)
+languages = english french dutch italian
 
-# App/program metadata
-NAME        := YOSHTI
-DESCRIPTION := "YoshiTI shell"
-ICON        :=           # (optional: path to a PNG icon)
-COMPRESSED  := YES
-ARCHIVED    := YES
+ifeq (release,$(filter release,$(MAKECMDGOALS)))
+compress = zx0
+endif
 
-# Sources
-ASM_SRCS := src/main.asm
+all: $(languages)
 
-# Tools
-FASMG    ?= fasmg
+$(languages):
+	mkdir -p build
+	fasmg  -i 'language := "$@"' src/cesium.asm build/cesium_$@.8xp
+ifneq ($(compress),)
+	convbin -k 8xp-compressed -e $(compress) -u -n CESIUM -j 8x -i build/cesium_$@.8xp -o build/cesium_$@.$(compress).8xp
+endif
 
-# IMPORTANT: fasmg source expects a *global* language symbol like \english
-# Using \\ so the child process sees a single backslash.
-ASMFLAGS := -i "language := \\english"
-
-# Include path for any .inc files (adjust if needed)
-INCLUDES := include
-
-# Extra include flags for fasmg (fasmg uses its own include syntax, but we keep this for clarity)
-# (No-op here; keep the variable for future use)
-ASMINC   :=
-
-# Output directory
-BINDIR   := bin
-
-# Primary target: build the program (produces bin/YOSHTI.8xp)
-.PHONY: all
-all: $(BINDIR)/$(NAME).8xp
-
-$(BINDIR):
-	@mkdir -p "$(BINDIR)"
-
-# Assemble with fasmg
-$(BINDIR)/$(NAME).8xp: $(ASM_SRCS) | $(BINDIR)
-	$(FASMG) "src/main.asm" "$@" $(ASMFLAGS)
-
-# Language convenience targets (build e.g. bin/YOSHTI-french.8xp via: make french)
-LANGUAGES := english french german spanish italian portuguese dutch polish turkish
-.PHONY: $(LANGUAGES)
-$(LANGUAGES): %: $(BINDIR)/$(NAME)-%.8xp
-
-$(BINDIR)/$(NAME)-%.8xp: $(ASM_SRCS) | $(BINDIR)
-	$(FASMG) "src/main.asm" "$@" -i "language := \\$*"
-
-# Clean
-.PHONY: clean
 clean:
-	@rm -f "$(BINDIR)/$(NAME).8xp" $(addprefix $(BINDIR)/$(NAME)-,$(addsuffix .8xp,$(LANGUAGES)))
+	rm -rf build
+
+release: | clean all
+	mkdir -p build/cesium
+	cp $(addsuffix .$(compress).8xp,$(addprefix build/cesium_,$(languages))) build/cesium
+	cp readme.md build/cesium/readme.md
+	cp creating_icons.md build/cesium/creating_icons.md
+	cd build && zip -r9 cesium.zip cesium
+
+.PHONY: all clean release $(languages)
