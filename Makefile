@@ -1,48 +1,57 @@
-# -------------------------------
-# YoshiTI Makefile (fasmg-based)
-# -------------------------------
-# Requirements:
-#   - fasmg in PATH (or set FASMG=./fasmg)
-#   - POSIX shell (Git Bash / WSL / macOS / Linux)
+# -----------------------------------------
+# YoshiTI (ASM) — CEdev-compatible Makefile
+# -----------------------------------------
+# Requires:
+#   - CEdev installed and CEDEV env var set
+#   - fasmg in PATH (or set FASMG below)
 
-FASMG   ?= fasmg
-SRC     ?= src/main.asm
-OUTDIR  ?= bin
-APPNAME ?= YOSHTI
+# App/program metadata
+NAME        := YOSHTI
+DESCRIPTION := "YoshiTI shell"
+ICON        :=           # (optional: path to a PNG icon)
+COMPRESSED  := YES
+ARCHIVED    := YES
 
-# Languages available for "make all"
-LANGUAGES ?= english french german spanish italian portuguese dutch polish turkish
+# Sources
+ASM_SRCS := src/main.asm
 
-.DEFAULT_GOAL := english
+# Tools
+FASMG    ?= fasmg
 
-$(OUTDIR):
-	@mkdir -p "$(OUTDIR)"
+# IMPORTANT: fasmg source expects a *global* language symbol like \english
+# Using \\ so the child process sees a single backslash.
+ASMFLAGS := -i "language := \\english"
 
-# Default (english) -> bin/YOSHTI.8xp
-.PHONY: english
-english: $(OUTDIR)/$(APPNAME).8xp
+# Include path for any .inc files (adjust if needed)
+INCLUDES := include
 
-$(OUTDIR)/$(APPNAME).8xp: $(SRC) | $(OUTDIR)
-	$(FASMG) "$(SRC)" "$@" -i "language := english"
+# Extra include flags for fasmg (fasmg uses its own include syntax, but we keep this for clarity)
+# (No-op here; keep the variable for future use)
+ASMINC   :=
 
-# Pattern for language variants -> bin/YOSHTI-<lang>.8xp
-$(OUTDIR)/$(APPNAME)-%.8xp: $(SRC) | $(OUTDIR)
-	$(FASMG) "$(SRC)" "$@" -i "language := $*"
+# Output directory
+BINDIR   := bin
 
-.PHONY: $(LANGUAGES)
-$(LANGUAGES): %: $(OUTDIR)/$(APPNAME)-%.8xp
-
+# Primary target: build the program (produces bin/YOSHTI.8xp)
 .PHONY: all
-all: $(addprefix $(OUTDIR)/$(APPNAME)-,$(addsuffix .8xp,$(LANGUAGES)))
+all: $(BINDIR)/$(NAME).8xp
 
+$(BINDIR):
+	@mkdir -p "$(BINDIR)"
+
+# Assemble with fasmg
+$(BINDIR)/$(NAME).8xp: $(ASM_SRCS) | $(BINDIR)
+	$(FASMG) "src/main.asm" "$@" $(ASMFLAGS)
+
+# Language convenience targets (build e.g. bin/YOSHTI-french.8xp via: make french)
+LANGUAGES := english french german spanish italian portuguese dutch polish turkish
+.PHONY: $(LANGUAGES)
+$(LANGUAGES): %: $(BINDIR)/$(NAME)-%.8xp
+
+$(BINDIR)/$(NAME)-%.8xp: $(ASM_SRCS) | $(BINDIR)
+	$(FASMG) "src/main.asm" "$@" -i "language := \\$*"
+
+# Clean
 .PHONY: clean
 clean:
-	@rm -f "$(OUTDIR)/$(APPNAME).8xp" $(addprefix $(OUTDIR)/$(APPNAME)-,$(addsuffix .8xp,$(LANGUAGES)))
-
-.PHONY: help
-help:
-	@echo "YoshiTI Makefile (fasmg)"
-	@echo "  make / make english     -> $(OUTDIR)/$(APPNAME).8xp (english)"
-	@echo "  make <lang>             -> $(OUTDIR)/$(APPNAME)-<lang>.8xp"
-	@echo "  make all                -> build all languages"
-	@echo "  make clean              -> remove artifacts"
+	@rm -f "$(BINDIR)/$(NAME).8xp" $(addprefix $(BINDIR)/$(NAME)-,$(addsuffix .8xp,$(LANGUAGES)))
