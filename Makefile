@@ -1,54 +1,65 @@
-# Copyright 2015-2024 Matt "MateoConLechuga" Waltz
+# -------------------------------
+# YoshiTI Makefile (fasmg-based)
+# -------------------------------
+# Build requirements:
+#   - fasmg in PATH (or set FASMG to an absolute path)
+#   - standard POSIX shell (Git Bash / WSL / macOS / Linux)
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# 1. Redistributions of source code must retain the above copyright notice,
-#    this list of conditions and the following disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright notice,
-#    this list of conditions and the following disclaimer in the documentation
-#    and/or other materials provided with the distribution.
-#
-# 3. Neither the name of the copyright holder nor the names of its contributors
-#    may be used to endorse or promote products derived from this software
-#    without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
+# Examples:
+#   make                 # builds YOSHTI.8xp (english)
+#   make english         # same as above
+#   make french          # builds bin/YOSHTI-french.8xp
+#   make all             # builds all listed languages
+#   make clean           # removes bin/*.8xp
 
-languages = english french dutch italian
+# --- Tool paths & project layout ---
+FASMG   ?= fasmg
+SRC     ?= src/main.asm
+OUTDIR  ?= bin
+APPNAME ?= YOSHTI
 
-ifeq (release,$(filter release,$(MAKECMDGOALS)))
-compress = zx0
-endif
+# --- Supported languages for 'all' ---
+LANGUAGES ?= english french german spanish italian portuguese dutch polish turkish
 
-all: $(languages)
+# Default build (english, plain name)
+.DEFAULT_GOAL := english
 
-$(languages):
-	mkdir -p build
-	fasmg  -i 'language := "$@"' src/yoshiti.asm build/yoshiti_$@.8xp
-ifneq ($(compress),)
-	convbin -k 8xp-compressed -e $(compress) -u -n YOSHITI -j 8x -i build/yoshiti_$@.8xp -o build/yoshiti_$@.$(compress).8xp
-endif
+# Ensure output dir exists
+$(OUTDIR):
+	@mkdir -p "$(OUTDIR)"
 
+# --- Primary target: english -> bin/YOSHTI.8xp ---
+.PHONY: english
+english: $(OUTDIR)/$(APPNAME).8xp
+
+$(OUTDIR)/$(APPNAME).8xp: $(SRC) | $(OUTDIR)
+	$(FASMG) "$(SRC)" "$@" -d language:=english
+
+# --- Pattern rule: per-language -> bin/YOSHTI-<lang>.8xp ---
+# Use: make <lang>  (e.g., 'make french') to build suffixed artifact.
+# If your source expects different language keys, change the mapping below.
+$(OUTDIR)/$(APPNAME)-%.8xp: $(SRC) | $(OUTDIR)
+	$(FASMG) "$(SRC)" "$@" -d language:=$*
+
+# Convenience phony targets for popular languages
+.PHONY: $(LANGUAGES)
+$(LANGUAGES): %: $(OUTDIR)/$(APPNAME)-%.8xp
+
+# Build ALL language variants
+.PHONY: all
+all: $(addprefix $(OUTDIR)/$(APPNAME)-,$(addsuffix .8xp,$(LANGUAGES)))
+
+# Clean
+.PHONY: clean
 clean:
-	rm -rf build
+	@rm -f "$(OUTDIR)/$(APPNAME).8xp" $(addprefix $(OUTDIR)/$(APPNAME)-,$(addsuffix .8xp,$(LANGUAGES)))
 
-release: | clean all
-	mkdir -p build/yoshiti
-	cp $(addsuffix .$(compress).8xp,$(addprefix build/yoshiti_,$(languages))) build/yoshiti
-	cp readme.md build/yoshiti/readme.md
-	cp creating_icons.md build/yoshiti/creating_icons.md
-	cd build && zip -r9 yoshiti.zip yoshiti
-
-.PHONY: all clean release $(languages)
+# Help
+.PHONY: help
+help:
+	@echo "YoshiTI Makefile"
+	@echo "  make / make english     -> $(OUTDIR)/$(APPNAME).8xp (english)"
+	@echo "  make <lang>             -> $(OUTDIR)/$(APPNAME)-<lang>.8xp"
+	@echo "  make all                -> build all in LANGUAGES"
+	@echo "  make clean              -> remove artifacts"
+	@echo "Variables you can override: FASMG, SRC, OUTDIR, APPNAME, LANGUAGES"
